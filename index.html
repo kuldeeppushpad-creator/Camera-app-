@@ -1,402 +1,234 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>LuminaCam AI Pro</title>
-    
-    <!-- Icons & Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- TensorFlow AI Libraries -->
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.11.0/dist/tf.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface@0.0.7/dist/blazeface.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Face Detection Camera</title>
 
-    <style>
-        :root {
-            --glass: rgba(255, 255, 255, 0.12);
-            --accent: #00f2ff;
-            --danger: #ff3b30;
-            --panel: rgba(0, 0, 0, 0.6);
-        }
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
 
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body, html { 
-            margin: 0; padding: 0; width: 100%; height: 100%; 
-            background: #000; font-family: 'Poppins', sans-serif; 
-            overflow: hidden; color: white;
-        }
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface"></script>
 
-        /* Fullscreen Camera */
-        #viewport {
-            position: relative; width: 100%; height: 100%;
-            display: flex; flex-direction: column; overflow: hidden;
-        }
-        video { width: 100%; height: 100%; object-fit: cover; position: absolute; }
-        canvas#ai-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; pointer-events: none; }
+<style>
 
-        /* UI Overlay */
-        .overlay { position: absolute; z-index: 10; width: 100%; pointer-events: none; }
-        .overlay * { pointer-events: auto; }
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+font-family:Poppins;
+}
 
-        /* Top Bar */
-        .top-bar {
-            top: 0; padding: 15px 20px;
-            display: flex; justify-content: space-between; align-items: center;
-            background: linear-gradient(to bottom, rgba(0,0,0,0.6), transparent);
-        }
+body{
+background:#0f0f0f;
+color:white;
+display:flex;
+flex-direction:column;
+align-items:center;
+min-height:100vh;
+}
 
-        /* Side Controls (Pro) */
-        .side-bar {
-            right: 10px; top: 50%; transform: translateY(-50%);
-            display: flex; flex-direction: column; gap: 20px;
-            align-items: center; background: var(--panel);
-            padding: 15px 8px; border-radius: 30px; backdrop-filter: blur(10px);
-        }
-        .side-bar input { writing-mode: bt-lr; -webkit-appearance: slider-vertical; width: 8px; height: 80px; }
+header{
+font-size:22px;
+font-weight:600;
+padding:15px;
+}
 
-        /* Bottom Controls */
-        .bottom-area {
-            bottom: 0; padding-bottom: 30px;
-            background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
-        }
+.camera-container{
+position:relative;
+width:95%;
+max-width:420px;
+border-radius:15px;
+overflow:hidden;
+box-shadow:0 0 20px rgba(0,0,0,0.6);
+}
 
-        /* Capture Button Logic */
-        .shutter-row {
-            display: flex; justify-content: space-around; align-items: center; width: 100%;
-            margin-top: 15px;
-        }
-        .shutter-outer {
-            width: 80px; height: 80px; border: 4px solid white; border-radius: 50%;
-            display: flex; justify-content: center; align-items: center;
-        }
-        .shutter-inner {
-            width: 62px; height: 62px; background: white; border-radius: 50%;
-            transition: 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-        .shutter-outer:active .shutter-inner { transform: scale(0.85); }
-        .recording .shutter-inner { background: var(--danger); border-radius: 8px; animation: pulse 1s infinite; }
+video{
+width:100%;
+border-radius:15px;
+}
 
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+canvas{
+position:absolute;
+top:0;
+left:0;
+}
 
-        /* Scene Detection Tag */
-        #scene-tag {
-            position: absolute; top: 80px; left: 50%; transform: translateX(-50%);
-            background: var(--accent); color: black; padding: 2px 12px;
-            border-radius: 20px; font-size: 10px; font-weight: bold; text-transform: uppercase;
-            display: none; box-shadow: 0 0 15px var(--accent);
-        }
+.controls{
+margin-top:20px;
+display:flex;
+gap:15px;
+}
 
-        /* Mode Selector */
-        .modes {
-            display: flex; gap: 20px; overflow-x: auto; padding: 10px 40px;
-            scrollbar-width: none; font-size: 13px; opacity: 0.7;
-        }
-        .mode-item { white-space: nowrap; cursor: pointer; }
-        .mode-item.active { color: var(--accent); font-weight: bold; border-bottom: 2px solid var(--accent); opacity: 1; }
+button{
+padding:12px 18px;
+border-radius:10px;
+border:2px solid #00f2ff;
+background:transparent;
+color:white;
+font-size:16px;
+cursor:pointer;
+transition:0.3s;
+}
 
-        /* Filter Shelf */
-        #filter-shelf {
-            display: flex; gap: 15px; padding: 10px 20px; overflow-x: auto;
-            scrollbar-width: none;
-        }
-        .f-item { text-align: center; font-size: 9px; min-width: 55px; }
-        .f-preview { width: 45px; height: 45px; border-radius: 12px; border: 2px solid transparent; background: #333; }
-        .f-item.active .f-preview { border-color: var(--accent); }
+button:hover{
+background:#00f2ff;
+color:black;
+transform:scale(1.08);
+}
 
-        /* Gallery Modal */
-        #editor-modal {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: #000; z-index: 100; display: none; flex-direction: column;
-        }
-        #preview-canvas { width: 100%; height: 70%; object-fit: contain; }
+button:active{
+transform:scale(0.95);
+}
 
-        /* Scan Line */
-        #scan-line {
-            position: absolute; width: 100%; height: 2px; background: var(--accent);
-            box-shadow: 0 0 10px var(--accent); top: 0; display: none;
-            animation: scan 2s linear infinite;
-        }
-        @keyframes scan { from { top: 20%; } to { top: 80%; } }
+#photo{
+margin-top:20px;
+width:90%;
+max-width:420px;
+border-radius:10px;
+}
 
-        .btn { background: none; border: none; color: white; font-size: 1.2rem; cursor: pointer; }
-    </style>
+/* Ad container */
+
+.ad-container{
+width:100%;
+display:flex;
+justify-content:center;
+margin-top:20px;
+}
+
+#ad-slot{
+width:320px;
+height:50px;
+}
+
+</style>
 </head>
+
 <body>
 
-    <div id="viewport">
-        <video id="video" autoplay playsinline muted></video>
-        <canvas id="ai-layer"></canvas>
-        <div id="scan-line"></div>
-        <div id="scene-tag">Portrait</div>
+<header>🤖 AI Face Detection Camera</header>
 
-        <!-- Top UI -->
-        <div class="overlay top-bar">
-            <button class="btn" onclick="toggleFlash()"><i class="fas fa-bolt"></i></button>
-            <button class="btn" onclick="setTimer()"><i class="fas fa-clock" id="timer-icon"></i></button>
-            <span style="font-weight: 600; letter-spacing: 2px; font-size: 0.9rem;">LUMINA<span style="color:var(--accent)">AI</span></span>
-            <button class="btn" onclick="switchCamera()"><i class="fas fa-camera-rotate"></i></button>
-        </div>
+<div class="camera-container">
+<video id="video" autoplay playsinline></video>
+<canvas id="canvas"></canvas>
+</div>
 
-        <!-- Side Controls -->
-        <div class="overlay side-bar">
-            <i class="fas fa-sun" style="font-size: 0.7rem;"></i>
-            <input type="range" min="0.5" max="2" step="0.1" value="1" id="exp-slider" oninput="applyManual()">
-            <i class="fas fa-adjust" style="font-size: 0.7rem;"></i>
-            <input type="range" min="0" max="100" value="0" id="wb-slider" oninput="applyManual()">
-        </div>
+<div class="controls">
+<button onclick="capturePhoto()">📸 Capture</button>
+<button onclick="startCamera()">🎥 Start</button>
+</div>
 
-        <!-- Bottom UI -->
-        <div class="overlay bottom-area">
-            <div id="filter-shelf"></div>
-            
-            <div class="modes" id="mode-list">
-                <span class="mode-item active" onclick="setMode('photo')">PHOTO</span>
-                <span class="mode-item" onclick="setMode('video')">VIDEO</span>
-                <span class="mode-item" onclick="setMode('scan')">QR SCAN</span>
-                <span class="mode-item" onclick="setMode('doc')">DOCUMENT</span>
-            </div>
+<img id="photo">
 
-            <div class="shutter-row">
-                <div id="gallery-btn" onclick="openEditor()" style="width:45px; height:45px; border-radius:10px; border:2px solid white; background-size:cover;"></div>
-                
-                <div class="shutter-outer" id="main-shutter">
-                    <div class="shutter-inner"></div>
-                </div>
+<!-- Ad Banner -->
+<div class="ad-container">
+<div id="ad-slot"></div>
+</div>
 
-                <button class="btn" onclick="alert('Settings: Pro Mode Active')"><i class="fas fa-sliders"></i></button>
-            </div>
-        </div>
-    </div>
+<script>
 
-    <!-- Editor / Preview Modal -->
-    <div id="editor-modal">
-        <div class="top-bar" style="background: #111;">
-            <button class="btn" onclick="closeEditor()"><i class="fas fa-arrow-left"></i></button>
-            <span>EDIT PHOTO</span>
-            <button class="btn" onclick="downloadResult()"><i class="fas fa-download"></i></button>
-        </div>
-        <img id="edit-img" style="width:100%; height:70%; object-fit: contain;">
-        <div style="padding: 20px; display: flex; justify-content: space-around; background: #111; flex-grow: 1;">
-            <button class="btn" onclick="applyAI()"><i class="fas fa-magic"></i> AI Enhance</button>
-            <button class="btn" onclick="alert('Added Stickers!')"><i class="fas fa-face-smile"></i> Sticker</button>
-            <button class="btn" onclick="share()"><i class="fas fa-share-nodes"></i> Share</button>
-        </div>
-    </div>
+/* Camera Start */
 
-    <script>
-        const video = document.getElementById('video');
-        const aiCanvas = document.getElementById('ai-layer');
-        const aiCtx = aiCanvas.getContext('2d');
-        const shutter = document.getElementById('main-shutter');
-        const sceneTag = document.getElementById('scene-tag');
-        
-        let currentStream, model, mediaRecorder;
-        let isFront = false;
-        let appMode = 'photo';
-        let recordedChunks = [];
-        let timerVal = 0;
-        let lastCapturedData = null;
+const video = document.getElementById("video");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
 
-        const filters = [
-            { name: 'Natural', css: 'none' },
-            { name: 'Cinematic', css: 'contrast(1.2) brightness(0.9) saturate(1.1)' },
-            { name: 'Vintage', css: 'sepia(0.5) contrast(1.1)' },
-            { name: 'B&W', css: 'grayscale(1) contrast(1.3)' },
-            { name: 'Neon', css: 'hue-rotate(90deg) saturate(2)' },
-            { name: 'Warm', css: 'sepia(0.2) saturate(1.4)' }
-        ];
+let model;
 
-        // 1. Core Camera Setup
-        async function initCamera() {
-            try {
-                if (currentStream) currentStream.getTracks().forEach(t => t.stop());
-                currentStream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: isFront ? 'user' : 'environment', width: 1280, height: 720 },
-                    audio: true
-                });
-                video.srcObject = currentStream;
-                video.onloadedmetadata = () => {
-                    video.play();
-                    startAI();
-                };
-            } catch (e) { alert("Camera Error: Check Permissions."); }
-        }
+async function startCamera(){
 
-        // 2. AI Face & Scene Detection
-        async function startAI() {
-            model = await blazeface.load();
-            loopAI();
-        }
+const stream = await navigator.mediaDevices.getUserMedia({
+video:true
+});
 
-        async function loopAI() {
-            if (video.paused || video.ended) return;
-            
-            // Ensure canvas matches video size
-            if (aiCanvas.width !== video.videoWidth) {
-                aiCanvas.width = video.videoWidth;
-                aiCanvas.height = video.videoHeight;
-            }
+video.srcObject = stream;
 
-            const preds = await model.estimateFaces(video, false);
-            aiCtx.clearRect(0, 0, aiCanvas.width, aiCanvas.height);
+video.onloadedmetadata = () => {
 
-            if (preds.length > 0) {
-                sceneTag.style.display = 'block';
-                sceneTag.innerText = "Portrait Mode";
-                preds.forEach(p => {
-                    aiCtx.strokeStyle = "#00f2ff";
-                    aiCtx.lineWidth = 6;
-                    const size = p.bottomRight[0] - p.topLeft[0];
-                    aiCtx.strokeRect(p.topLeft[0], p.topLeft[1], size, size);
-                });
-            } else {
-                sceneTag.style.display = appMode === 'doc' ? 'block' : 'none';
-                if(appMode === 'doc') sceneTag.innerText = "Document Detection";
-            }
-            requestAnimationFrame(loopAI);
-        }
+canvas.width = video.videoWidth;
+canvas.height = video.videoHeight;
 
-        // 3. Shutter Actions
-        shutter.onclick = () => {
-            if (appMode === 'photo' || appMode === 'doc') {
-                if(timerVal > 0) {
-                    let c = timerVal;
-                    const t = setInterval(() => {
-                        sceneTag.style.display = 'block';
-                        sceneTag.innerText = `Capture in ${c}...`;
-                        if(c-- <= 0) { clearInterval(t); capturePhoto(); sceneTag.style.display = 'none'; }
-                    }, 1000);
-                } else { capturePhoto(); }
-            } else if (appMode === 'video') {
-                isRecording ? stopVideo() : startVideo();
-            }
-        };
+detectFaces();
 
-        function capturePhoto() {
-            const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            const ctx = canvas.getContext('2d');
-            
-            // Apply Filters
-            ctx.filter = getComputedStyle(video).filter;
-            ctx.drawImage(video, 0, 0);
+}
 
-            if (appMode === 'doc') {
-                ctx.filter = 'contrast(2) grayscale(1)'; // Doc Scan Look
-                ctx.drawImage(canvas, 0, 0);
-            }
+}
 
-            lastCapturedData = canvas.toDataURL('image/jpeg');
-            document.getElementById('gallery-btn').style.backgroundImage = `url(${lastCapturedData})`;
-            
-            // Flash Animation
-            const flash = document.createElement('div');
-            flash.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:white; z-index:1000;";
-            document.body.appendChild(flash);
-            setTimeout(() => flash.remove(), 100);
-        }
+/* Load AI Model */
 
-        // 4. Video Recording Logic
-        let isRecording = false;
-        function startVideo() {
-            isRecording = true;
-            shutter.classList.add('recording');
-            recordedChunks = [];
-            mediaRecorder = new MediaRecorder(currentStream);
-            mediaRecorder.ondataavailable = e => recordedChunks.push(e.data);
-            mediaRecorder.onstop = () => {
-                const blob = new Blob(recordedChunks, { type: 'video/mp4' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url; a.download = 'LuminaVideo.mp4'; a.click();
-            };
-            mediaRecorder.start();
-        }
-        function stopVideo() {
-            isRecording = false;
-            shutter.classList.remove('recording');
-            mediaRecorder.stop();
-        }
+async function loadModel(){
+model = await blazeface.load();
+}
 
-        // 5. Features & Modes
-        function setMode(mode) {
-            appMode = mode;
-            document.querySelectorAll('.mode-item').forEach(el => el.classList.remove('active'));
-            event.target.classList.add('active');
-            
-            document.getElementById('scan-line').style.display = (mode === 'scan') ? 'block' : 'none';
-            if(mode === 'scan') alert("QR Mode: Point at a QR code to read (Simulation)");
-        }
+loadModel();
 
-        function applyManual() {
-            const exp = document.getElementById('exp-slider').value;
-            const wb = document.getElementById('wb-slider').value;
-            video.style.filter = `brightness(${exp}) hue-rotate(${wb}deg)`;
-        }
+/* Face Detection */
 
-        function switchCamera() {
-            isFront = !isFront;
-            initCamera();
-        }
+async function detectFaces(){
 
-        function toggleFlash() {
-            alert("Hardware Flash access is restricted by browsers. Using Screen Flash.");
-        }
+const predictions = await model.estimateFaces(video,false);
 
-        function setTimer() {
-            timerVal = timerVal === 0 ? 3 : (timerVal === 3 ? 10 : 0);
-            document.getElementById('timer-icon').style.color = timerVal > 0 ? 'var(--accent)' : 'white';
-        }
+ctx.clearRect(0,0,canvas.width,canvas.height);
 
-        // 6. Editor & Post Processing
-        function openEditor() {
-            if(!lastCapturedData) return alert("Take a photo first!");
-            document.getElementById('edit-img').src = lastCapturedData;
-            document.getElementById('editor-modal').style.display = 'flex';
-        }
+predictions.forEach(prediction=>{
 
-        function closeEditor() { document.getElementById('editor-modal').style.display = 'none'; }
+const start = prediction.topLeft;
+const end = prediction.bottomRight;
 
-        function applyAI() {
-            const img = document.getElementById('edit-img');
-            img.style.filter = "contrast(1.2) saturate(1.2) brightness(1.1) sharpen(1.2)";
-            alert("AI Enhancement Applied!");
-        }
+const size = [
+end[0]-start[0],
+end[1]-start[1]
+];
 
-        function downloadResult() {
-            const a = document.createElement('a');
-            a.href = document.getElementById('edit-img').src;
-            a.download = "Lumina_Pro.jpg";
-            a.click();
-        }
+ctx.strokeStyle="#00ffea";
+ctx.lineWidth=3;
+ctx.strokeRect(start[0],start[1],size[0],size[1]);
 
-        // 7. Load Filters
-        function loadFilters() {
-            const shelf = document.getElementById('filter-shelf');
-            filters.forEach(f => {
-                const item = document.createElement('div');
-                item.className = 'f-item';
-                item.innerHTML = `
-                    <div class="f-preview" style="filter:${f.css}; background:url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=100')"></div>
-                    <span>${f.name}</span>
-                `;
-                item.onclick = () => {
-                    video.style.filter = f.css;
-                    document.querySelectorAll('.f-item').forEach(i => i.classList.remove('active'));
-                    item.classList.add('active');
-                };
-                shelf.appendChild(item);
-            });
-        }
+});
 
-        window.onload = () => {
-            loadFilters();
-            initCamera();
-        };
+requestAnimationFrame(detectFaces);
 
-    </script>
+}
+
+/* Capture Photo */
+
+function capturePhoto(){
+
+const photoCanvas = document.createElement("canvas");
+photoCanvas.width = video.videoWidth;
+photoCanvas.height = video.videoHeight;
+
+const photoCtx = photoCanvas.getContext("2d");
+
+photoCtx.drawImage(video,0,0);
+
+document.getElementById("photo").src =
+photoCanvas.toDataURL("image/png");
+
+}
+
+/* Ads Script */
+
+(function(){
+
+window.atOptions = {
+key : "c46b49b27476a02f3363a7a17fba73d6",
+format : "iframe",
+height : 50,
+width : 320,
+params : {}
+};
+
+const script = document.createElement("script");
+script.src =
+"//www.highperformanceformat.com/c46b49b27476a02f3363a7a17fba73d6/invoke.js";
+
+document.getElementById("ad-slot").appendChild(script);
+
+})();
+
+</script>
+
 </body>
 </html>
